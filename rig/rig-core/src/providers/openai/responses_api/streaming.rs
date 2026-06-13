@@ -408,7 +408,12 @@ where
                                     yield Ok(streaming::RawStreamingChoice::Message(delta.delta.clone()))
                                 }
                                 ItemChunkKind::ReasoningTextDelta(delta) => {
-                                    yield Ok(streaming::RawStreamingChoice::ReasoningDelta { id: None, reasoning: delta.delta.clone() })
+                                    // Carry the reasoning item's id (from the outer ItemChunk —
+                                    // the delta's own item_id is consumed by ItemChunk's flatten).
+                                    // Without an id, threading this reasoning back into a later
+                                    // request fails `openai_reasoning_from_core` ("an OpenAI-generated
+                                    // ID is required"), which breaks multi-turn tool loops.
+                                    yield Ok(streaming::RawStreamingChoice::ReasoningDelta { id: chunk.item_id.clone(), reasoning: delta.delta.clone() })
                                 }
                                 ItemChunkKind::ReasoningSummaryTextDelta(delta) => {
                                     yield Ok(streaming::RawStreamingChoice::ReasoningDelta { id: None, reasoning: delta.delta.clone() })
