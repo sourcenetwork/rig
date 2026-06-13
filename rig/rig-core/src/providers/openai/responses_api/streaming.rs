@@ -194,8 +194,11 @@ pub enum ItemChunkKind {
     // rig only decodes the summary events, so raw reasoning is silently dropped.
     // The deltas accumulate the full reasoning text; the matching `.done` event
     // is redundant for capture and is skipped by the loop's unknown-event path.
+    // Uses DeltaTextChunk (no `item_id`): ItemChunk's `#[serde(flatten)]`
+    // already consumes the top-level `item_id`, so an inner struct that also
+    // required it would fail to deserialize and the event would be dropped.
     #[serde(rename = "response.reasoning_text.delta")]
-    ReasoningTextDelta(DeltaTextChunkWithItemId),
+    ReasoningTextDelta(DeltaTextChunk),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -723,6 +726,27 @@ mod tests {
                     chunk.data,
                     ItemChunkKind::ContentPartDone(_)
                 )
+        ));
+    }
+
+    #[test]
+    fn reasoning_text_delta_deserializes_vllm_raw_reasoning() {
+        // vLLM/d4f streams the model's RAW chain-of-thought as this event
+        // (OpenAI hosted models only emit reasoning_summary_text.delta).
+        let chunk: StreamingCompletionChunk = serde_json::from_value(json!({
+            "content_index": 0,
+            "delta": "We",
+            "item_id": "940fd02b9cc0c165",
+            "output_index": 0,
+            "sequence_number": 4,
+            "type": "response.reasoning_text.delta"
+        }))
+        .expect("reasoning_text.delta event should deserialize");
+
+        assert!(matches!(
+            chunk,
+            StreamingCompletionChunk::Delta(chunk)
+                if matches!(chunk.data, ItemChunkKind::ReasoningTextDelta(ref d) if d.delta == "We")
         ));
     }
 
