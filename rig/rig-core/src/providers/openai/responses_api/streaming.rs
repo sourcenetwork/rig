@@ -188,6 +188,14 @@ pub enum ItemChunkKind {
     ReasoningSummaryTextDelta(SummaryTextChunk),
     #[serde(rename = "response.reasoning_summary_text.done")]
     ReasoningSummaryTextDone(SummaryTextChunk),
+    // vLLM (and other open-weights Responses servers) stream the model's RAW
+    // chain-of-thought as `response.reasoning_text.delta`, distinct from OpenAI's
+    // hosted models which only expose a `reasoning_summary_text.delta`. Upstream
+    // rig only decodes the summary events, so raw reasoning is silently dropped.
+    // The deltas accumulate the full reasoning text; the matching `.done` event
+    // is redundant for capture and is skipped by the loop's unknown-event path.
+    #[serde(rename = "response.reasoning_text.delta")]
+    ReasoningTextDelta(DeltaTextChunkWithItemId),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -395,6 +403,9 @@ where
                                 }
                                 ItemChunkKind::OutputTextDelta(delta) => {
                                     yield Ok(streaming::RawStreamingChoice::Message(delta.delta.clone()))
+                                }
+                                ItemChunkKind::ReasoningTextDelta(delta) => {
+                                    yield Ok(streaming::RawStreamingChoice::ReasoningDelta { id: None, reasoning: delta.delta.clone() })
                                 }
                                 ItemChunkKind::ReasoningSummaryTextDelta(delta) => {
                                     yield Ok(streaming::RawStreamingChoice::ReasoningDelta { id: None, reasoning: delta.delta.clone() })

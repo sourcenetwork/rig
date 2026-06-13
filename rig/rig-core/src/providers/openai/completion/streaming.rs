@@ -35,7 +35,12 @@ pub(crate) struct StreamingToolCall {
 struct StreamingDelta {
     #[serde(default)]
     content: Option<String>,
-    #[serde(default)]
+    // Accept BOTH OpenAI-compatible field names for streamed chain-of-thought:
+    // `reasoning_content` (GLM-4 / DeepSeek-R1 / Qwen3 convention) and `reasoning`
+    // (vLLM's newer reasoning parsers, e.g. `deepseek_v4`, and OpenAI's own
+    // reasoning field). Upstream rig only knew `reasoning_content`, so reasoning
+    // from a `--reasoning-parser deepseek_v4` server was silently dropped.
+    #[serde(default, alias = "reasoning")]
     reasoning_content: Option<String>, // This is not part of the official OpenAI API
     #[serde(default, deserialize_with = "json_utils::null_or_vec")]
     tool_calls: Vec<StreamingToolCall>,
