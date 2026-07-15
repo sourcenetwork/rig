@@ -79,7 +79,7 @@ fn test_nested_objects() {
         description: "Submit".to_string(),
         parameters: serde_json::to_value(schema).unwrap(),
     };
-    let response = ResponsesToolDefinition::from(tool_def);
+    let response = ResponsesToolDefinition::from(tool_def).with_strict();
 
     assert!(
         check_add_prps(&response.parameters),
@@ -95,7 +95,7 @@ fn test_array_items() {
         description: "Submit".to_string(),
         parameters: serde_json::to_value(schema).unwrap(),
     };
-    let response = ResponsesToolDefinition::from(tool_def);
+    let response = ResponsesToolDefinition::from(tool_def).with_strict();
 
     assert!(
         check_add_prps(&response.parameters),
@@ -111,10 +111,68 @@ fn test_enum_schemas() {
         description: "Submit".to_string(),
         parameters: serde_json::to_value(schema).unwrap(),
     };
-    let response = ResponsesToolDefinition::from(tool_def);
+    let response = ResponsesToolDefinition::from(tool_def).with_strict();
 
     assert!(
         check_add_prps(&response.parameters),
         "Enum variants (anyOf/oneOf) should have additionalProperties: false"
     );
+}
+
+#[test]
+fn non_strict_tools_preserve_optional_parameters() {
+    let tool_def = ToolDefinition {
+        name: "query".to_string(),
+        description: "Query".to_string(),
+        parameters: serde_json::json!({
+            "type": "object",
+            "properties": {
+                "collection": { "type": "string" },
+                "limit": { "type": "integer" }
+            },
+            "required": ["collection"]
+        }),
+    };
+
+    let response = ResponsesToolDefinition::from(tool_def);
+
+    assert!(!response.strict);
+    assert_eq!(
+        response.parameters["required"],
+        serde_json::json!(["collection"])
+    );
+    assert!(response.parameters.get("additionalProperties").is_none());
+}
+
+#[test]
+fn strict_tools_normalize_all_parameters() {
+    let tool_def = ToolDefinition {
+        name: "query".to_string(),
+        description: "Query".to_string(),
+        parameters: serde_json::json!({
+            "type": "object",
+            "properties": {
+                "collection": { "type": "string" },
+                "limit": { "type": "integer" }
+            },
+            "required": ["collection"]
+        }),
+    };
+
+    let response = ResponsesToolDefinition::from(tool_def).with_strict();
+
+    assert!(response.strict);
+    assert_eq!(
+        response.parameters["required"],
+        serde_json::json!(["collection", "limit"])
+    );
+    assert_eq!(response.parameters["additionalProperties"], false);
+}
+
+#[test]
+fn strict_mode_does_not_modify_hosted_tools() {
+    let response = ResponsesToolDefinition::web_search().with_strict();
+
+    assert!(!response.strict);
+    assert!(response.parameters.is_null());
 }
