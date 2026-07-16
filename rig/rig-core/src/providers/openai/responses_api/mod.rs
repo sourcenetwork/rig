@@ -518,10 +518,10 @@ pub struct ResponsesToolDefinition {
     /// Tool name
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub name: String,
-    /// Parameters - this should be a JSON schema. Tools should additionally ensure an "additionalParameters" field has been added with the value set to false, as this is required if using OpenAI's strict mode (enabled by default).
+    /// Parameters - this should be a JSON schema. Tools should additionally ensure an "additionalProperties" field has been added with the value set to false when using OpenAI's strict mode.
     #[serde(default, skip_serializing_if = "is_json_null")]
     pub parameters: serde_json::Value,
-    /// Whether to use strict mode. Enabled by default as it allows for improved efficiency.
+    /// Whether to use strict mode.
     #[serde(default, skip_serializing_if = "is_false")]
     pub strict: bool,
     /// Tool description.
@@ -545,18 +545,24 @@ impl ResponsesToolDefinition {
     pub fn function(
         name: impl Into<String>,
         description: impl Into<String>,
-        mut parameters: serde_json::Value,
+        parameters: serde_json::Value,
     ) -> Self {
-        super::sanitize_schema(&mut parameters);
-
         Self {
             kind: "function".to_string(),
             name: name.into(),
             parameters,
-            strict: true,
+            strict: false,
             description: description.into(),
             config: Map::new(),
         }
+    }
+
+    /// Enables strict mode and normalizes the function's JSON schema for OpenAI.
+    pub fn with_strict(mut self) -> Self {
+        if self.kind == "function" {
+            self.strict = true;
+        }
+        self.normalize()
     }
 
     /// Creates a hosted tool definition for an arbitrary hosted tool type.
@@ -593,9 +599,8 @@ impl ResponsesToolDefinition {
     }
 
     fn normalize(mut self) -> Self {
-        if self.kind == "function" {
+        if self.kind == "function" && self.strict {
             super::sanitize_schema(&mut self.parameters);
-            self.strict = true;
         }
         self
     }
@@ -887,6 +892,8 @@ pub struct ResponsesCompletionModel<T = reqwest::Client> {
     pub model: String,
     /// Model-level default tools that are always added to outgoing requests.
     pub tools: Vec<ResponsesToolDefinition>,
+    /// Whether to normalize function tool schemas for OpenAI strict mode.
+    pub strict_tools: bool,
 }
 
 impl<T> ResponsesCompletionModel<T>
@@ -899,6 +906,7 @@ where
             client,
             model: model.into(),
             tools: Vec::new(),
+            strict_tools: false,
         }
     }
 
@@ -907,6 +915,7 @@ where
             client,
             model: model.to_string(),
             tools: Vec::new(),
+            strict_tools: false,
         }
     }
 
@@ -926,6 +935,12 @@ where
         self
     }
 
+    /// Enables strict mode for all function tool schemas.
+    pub fn with_strict_tools(mut self) -> Self {
+        self.strict_tools = true;
+        self
+    }
+
     /// Use the Completions API instead of Responses.
     pub fn completions_api(self) -> crate::providers::openai::completion::CompletionModel<T> {
         super::completion::CompletionModel::with_model(self.client.completions_api(), &self.model)
@@ -938,6 +953,17 @@ where
     ) -> Result<CompletionRequest, CompletionError> {
         let mut req = CompletionRequest::try_from((self.model.clone(), completion_request))?;
         req.tools.extend(self.tools.clone());
+        req.tools = req
+            .tools
+            .into_iter()
+            .map(|tool| {
+                if self.strict_tools {
+                    tool.with_strict()
+                } else {
+                    tool.normalize()
+                }
+            })
+            .collect();
 
         Ok(req)
     }
