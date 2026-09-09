@@ -11,7 +11,7 @@
 //! Types implementing [`VectorStoreIndex`] automatically implement [`Tool`].
 
 pub use request::VectorSearchRequest;
-use reqwest::StatusCode;
+use http::StatusCode;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
@@ -38,20 +38,21 @@ pub enum VectorStoreError {
     #[error("Json error: {0}")]
     JsonError(#[from] serde_json::Error),
 
-    #[cfg(not(target_family = "wasm"))]
+    #[cfg(not(all(feature = "wasm", target_arch = "wasm32")))]
     #[error("Datastore error: {0}")]
     DatastoreError(#[from] Box<dyn std::error::Error + Send + Sync + 'static>),
 
     #[error("Filter error: {0}")]
     FilterError(#[from] FilterError),
 
-    #[cfg(target_family = "wasm")]
+    #[cfg(all(feature = "wasm", target_arch = "wasm32"))]
     #[error("Datastore error: {0}")]
     DatastoreError(#[from] Box<dyn std::error::Error + 'static>),
 
     #[error("Missing Id: {0}")]
     MissingIdError(String),
 
+    #[cfg(feature = "reqwest")]
     #[error("HTTP request error: {0}")]
     ReqwestError(#[from] reqwest::Error),
 

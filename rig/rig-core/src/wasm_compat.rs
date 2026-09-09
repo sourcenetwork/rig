@@ -51,10 +51,10 @@ impl<T> WasmCompatSync for T where T: Sync {}
 #[cfg(all(feature = "wasm", target_arch = "wasm32"))]
 impl<T> WasmCompatSync for T {}
 
-#[cfg(not(target_family = "wasm"))]
+#[cfg(not(all(feature = "wasm", target_arch = "wasm32")))]
 pub type WasmBoxedFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
-#[cfg(target_family = "wasm")]
+#[cfg(all(feature = "wasm", target_arch = "wasm32"))]
 pub type WasmBoxedFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
 
 #[macro_export]

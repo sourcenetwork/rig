@@ -25,11 +25,11 @@ use crate::{
 
 #[derive(Debug, thiserror::Error)]
 pub enum ToolError {
-    #[cfg(not(target_family = "wasm"))]
+    #[cfg(not(all(feature = "wasm", target_arch = "wasm32")))]
     /// Error returned by the tool
     ToolCallError(#[from] Box<dyn std::error::Error + Send + Sync>),
 
-    #[cfg(target_family = "wasm")]
+    #[cfg(all(feature = "wasm", target_arch = "wasm32"))]
     /// Error returned by the tool
     ToolCallError(#[from] Box<dyn std::error::Error>),
     /// Error caused by a de/serialization fail
