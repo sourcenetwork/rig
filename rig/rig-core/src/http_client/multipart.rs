@@ -183,6 +183,7 @@ impl MultipartForm {
     }
 }
 
+#[cfg(feature = "reqwest")]
 impl From<MultipartForm> for reqwest::multipart::Form {
     fn from(value: MultipartForm) -> Self {
         let mut form = reqwest::multipart::Form::new();

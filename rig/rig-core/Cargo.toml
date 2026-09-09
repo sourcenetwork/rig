@@ -32,7 +32,7 @@ mime_guess = { workspace = true }
 ordered-float = { workspace = true }
 quick-xml = { workspace = true, optional = true }
 rayon = { workspace = true, optional = true }
-reqwest = { workspace = true, features = ["json", "stream", "multipart"] }
+reqwest = { workspace = true, features = ["json", "stream", "multipart"], optional = true }
 rig-derive = { version = "0.1.12", path = "../rig-derive", optional = true }
 schemars = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
@@ -120,8 +120,9 @@ wasm = [
   "getrandom/js",
 ]
 rmcp = ["dep:rmcp"]
-socks = ["reqwest/socks"]
+socks = ["dep:reqwest", "reqwest/socks"]
 reqwest = [
+  "dep:reqwest",
   "reqwest/charset",
   "reqwest/http2",
   "reqwest/system-proxy",
@@ -129,7 +130,10 @@ reqwest = [
 websocket = ["dep:tokio-tungstenite"]
 rustls = ["reqwest/rustls", "tokio-tungstenite?/rustls-tls-webpki-roots"]
 native-tls = ["reqwest/native-tls", "tokio-tungstenite?/native-tls"]
-reqwest-middleware = ["dep:reqwest-middleware"]
+# reqwest_middleware::ClientWithMiddleware wraps a reqwest::Client, and
+# rig-core's own HttpClientExt impl for it names `reqwest::` types directly, so
+# enabling reqwest-middleware still needs the optional reqwest dependency on.
+reqwest-middleware = ["dep:reqwest-middleware", "dep:reqwest"]
 reqwest-middleware-rustls = ["dep:reqwest-middleware", "rustls", "reqwest-middleware/rustls"]
 reqwest-middleware-native-tls = ["dep:reqwest-middleware", "native-tls", "reqwest/native-tls"]
 
