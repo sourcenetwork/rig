@@ -129,6 +129,12 @@ pub mod model;
 pub mod one_or_many;
 pub mod pipeline;
 pub mod prelude;
+// Every provider client is built around `reqwest::Client` (directly, or as
+// the default `H` type parameter), so the whole module needs the `reqwest`
+// dependency; a caller that only needs `CompletionModel` and the message
+// family (rig-core built with `default-features = false`) never reaches it.
+#[cfg(feature = "reqwest")]
+#[cfg_attr(docsrs, doc(cfg(feature = "reqwest")))]
 pub mod providers;
 
 pub mod streaming;

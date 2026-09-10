@@ -3,6 +3,9 @@
 //! Dyn-compatible traits have been provided to allow for more provider-agnostic code.
 
 pub mod audio_generation;
+// The deprecated `DynClientBuilder` names every provider directly, so it
+// needs the same `reqwest` closure the `providers` module needs.
+#[cfg(feature = "reqwest")]
 pub mod builder;
 pub mod completion;
 pub mod embeddings;
@@ -45,6 +48,7 @@ use crate::{
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum ClientBuilderError {
+    #[cfg(feature = "reqwest")]
     #[error("reqwest error: {0}")]
     HttpError(
         #[from]
@@ -54,6 +58,23 @@ pub enum ClientBuilderError {
     #[error("invalid property: {0}")]
     InvalidProperty(&'static str),
 }
+
+/// The default backing HTTP client type for [`Client`], [`ClientBuilder`], and
+/// [`Capabilities`] when the caller does not name one explicitly. `reqwest`'s
+/// client when the `reqwest` feature is on; otherwise an uninhabited
+/// placeholder, since a caller building without `reqwest` (a wasm guest, for
+/// example) always supplies its own `H` and never reaches this default.
+#[cfg(feature = "reqwest")]
+pub type DefaultHttpClient = reqwest::Client;
+
+/// See [`DefaultHttpClient`] (`reqwest` feature off). No value of this type
+/// can ever be constructed.
+#[cfg(not(feature = "reqwest"))]
+#[derive(Debug, Clone)]
+pub enum NoDefaultHttpClient {}
+
+#[cfg(not(feature = "reqwest"))]
+pub type DefaultHttpClient = NoDefaultHttpClient;
 
 /// Abstracts over the ability to instantiate a client, either via environment variables or some
 /// `Self::Input`
@@ -125,7 +146,7 @@ impl TryFrom<String> for Nothing {
 }
 
 #[derive(Clone)]
-pub struct Client<Ext = Nothing, H = reqwest::Client> {
+pub struct Client<Ext = Nothing, H = DefaultHttpClient> {
     base_url: Arc<str>,
     headers: Arc<HeaderMap>,
     http_client: H,
@@ -219,7 +240,7 @@ impl Capability for Nothing {
 }
 
 /// The capabilities of a given provider, i.e. embeddings, audio transcriptions, text completion
-pub trait Capabilities<H = reqwest::Client> {
+pub trait Capabilities<H = DefaultHttpClient> {
     type Completion: Capability;
     type Embeddings: Capability;
     type Transcription: Capability;
@@ -259,6 +280,7 @@ pub trait ProviderBuilder: Sized + Default + Clone {
     }
 }
 
+#[cfg(feature = "reqwest")]
 impl<Ext> Client<Ext, reqwest::Client>
 where
     Ext: Provider,
@@ -343,6 +365,7 @@ where
     }
 }
 
+#[cfg(feature = "reqwest")]
 impl<Ext> Client<Ext, reqwest::Client>
 where
     Ext: Provider,
@@ -449,7 +472,7 @@ where
 
         match response.status() {
             StatusCode::OK => Ok(()),
-            StatusCode::UNAUTHORIZED | reqwest::StatusCode::FORBIDDEN => {
+            StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => {
                 Err(VerifyError::InvalidAuthentication)
             }
             StatusCode::INTERNAL_SERVER_ERROR => {
@@ -481,7 +504,7 @@ pub struct NeedsApiKey;
 
 // ApiKey is generic because Anthropic uses custom auth header, local models like Ollama use none
 #[derive(Clone)]
-pub struct ClientBuilder<Ext, ApiKey = NeedsApiKey, H = reqwest::Client> {
+pub struct ClientBuilder<Ext, ApiKey = NeedsApiKey, H = DefaultHttpClient> {
     base_url: String,
     api_key: ApiKey,
     headers: HeaderMap,
@@ -718,7 +741,7 @@ where
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "reqwest"))]
 mod tests {
     use crate::providers::anthropic;
 

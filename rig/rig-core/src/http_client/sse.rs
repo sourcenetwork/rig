@@ -29,12 +29,12 @@ use std::{
 
 pub type BoxedStream = Pin<Box<dyn WasmCompatSendStream<InnerItem = StreamResult<Bytes>>>>;
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(all(feature = "wasm", target_arch = "wasm32")))]
 type ResponseFuture = BoxFuture<'static, Result<Response<BoxedStream>, super::Error>>;
 #[cfg(all(feature = "wasm", target_arch = "wasm32"))]
 type ResponseFuture = LocalBoxFuture<'static, Result<Response<BoxedStream>, super::Error>>;
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(all(feature = "wasm", target_arch = "wasm32")))]
 type EventStream = BoxStream<'static, Result<MessageEvent, EventStreamError<super::Error>>>;
 #[cfg(all(feature = "wasm", target_arch = "wasm32"))]
 type EventStream = LocalBoxStream<'static, Result<MessageEvent, EventStreamError<super::Error>>>;
@@ -355,7 +355,7 @@ fn check_response<T>(response: Response<T>) -> Result<Response<T>, super::Error>
     };
 
     let content_type =
-        if let Some(content_type) = response.headers().get(&reqwest::header::CONTENT_TYPE) {
+        if let Some(content_type) = response.headers().get(&http::header::CONTENT_TYPE) {
             content_type
         } else {
             return Err(super::Error::InvalidContentType(HeaderValue::from_static(

@@ -2,13 +2,16 @@ use crate::http_client::sse::BoxedStream;
 use bytes::Bytes;
 pub use http::{HeaderMap, HeaderValue, Method, Request, Response, Uri, request::Builder};
 use http::{HeaderName, StatusCode};
+#[cfg(feature = "reqwest")]
 use reqwest::Body;
 pub mod multipart;
 pub mod retry;
 pub mod sse;
 use crate::wasm_compat::*;
 pub use multipart::MultipartForm;
+#[cfg(feature = "reqwest")]
 pub use reqwest::Client as ReqwestClient;
+#[cfg(feature = "reqwest")]
 use std::pin::Pin;
 
 #[derive(Debug, thiserror::Error)]
@@ -27,23 +30,23 @@ pub enum Error {
     StreamEnded,
     #[error("Invalid content type was returned: {0:?}")]
     InvalidContentType(HeaderValue),
-    #[cfg(not(target_family = "wasm"))]
+    #[cfg(not(all(feature = "wasm", target_arch = "wasm32")))]
     #[error("Http client error: {0}")]
     Instance(#[from] Box<dyn std::error::Error + Send + Sync + 'static>),
 
-    #[cfg(target_family = "wasm")]
+    #[cfg(all(feature = "wasm", target_arch = "wasm32"))]
     #[error("Http client error: {0}")]
     Instance(#[from] Box<dyn std::error::Error + 'static>),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[cfg(not(target_family = "wasm"))]
+#[cfg(not(all(feature = "wasm", target_arch = "wasm32")))]
 pub(crate) fn instance_error<E: std::error::Error + Send + Sync + 'static>(error: E) -> Error {
     Error::Instance(error.into())
 }
 
-#[cfg(target_family = "wasm")]
+#[cfg(all(feature = "wasm", target_arch = "wasm32"))]
 fn instance_error<E: std::error::Error + 'static>(error: E) -> Error {
     Error::Instance(error.into())
 }
@@ -62,6 +65,7 @@ impl From<NoBody> for Bytes {
     }
 }
 
+#[cfg(feature = "reqwest")]
 impl From<NoBody> for Body {
     fn from(_: NoBody) -> Self {
         reqwest::Body::default()
@@ -125,6 +129,8 @@ pub trait HttpClientExt: WasmCompatSend + WasmCompatSync {
         T: Into<Bytes>;
 }
 
+#[cfg(feature = "reqwest")]
+#[cfg_attr(docsrs, doc(cfg(feature = "reqwest")))]
 impl HttpClientExt for reqwest::Client {
     fn send<T, U>(
         &self,
@@ -242,12 +248,12 @@ impl HttpClientExt for reqwest::Client {
                 ));
             }
 
-            #[cfg(not(target_family = "wasm"))]
+            #[cfg(not(all(feature = "wasm", target_arch = "wasm32")))]
             let mut res = Response::builder()
                 .status(response.status())
                 .version(response.version());
 
-            #[cfg(target_family = "wasm")]
+            #[cfg(all(feature = "wasm", target_arch = "wasm32"))]
             let mut res = Response::builder().status(response.status());
 
             if let Some(hs) = res.headers_mut() {
@@ -387,12 +393,12 @@ impl HttpClientExt for reqwest_middleware::ClientWithMiddleware {
                 ));
             }
 
-            #[cfg(not(target_family = "wasm"))]
+            #[cfg(not(all(feature = "wasm", target_arch = "wasm32")))]
             let mut res = Response::builder()
                 .status(response.status())
                 .version(response.version());
 
-            #[cfg(target_family = "wasm")]
+            #[cfg(all(feature = "wasm", target_arch = "wasm32"))]
             let mut res = Response::builder().status(response.status());
 
             if let Some(hs) = res.headers_mut() {
